@@ -12,7 +12,7 @@ class APIManager:
         self.refresh_expiry = None
 
     def authenticate(self):
-        url = f"{API_URL}/api/auth/login"  # Guessing, needs confirmation
+        url = f"{API_URL}/api/auth/login"  # Still guessing, docs don’t confirm
         payload = {"login": API_LOGIN, "password": API_PASSWORD}
         try:
             response = requests.post(url, json=payload, timeout=10)
@@ -29,7 +29,7 @@ class APIManager:
             return False
 
     def refresh_access_token(self):
-        url = f"{API_URL}/api/auth/refresh"  # Guessing, needs confirmation
+        url = f"{API_URL}/api/auth/refresh"  # Still guessing
         payload = {"refresh_token": self.refresh_token}
         try:
             response = requests.post(url, json=payload, timeout=10)
@@ -67,8 +67,12 @@ class APIManager:
                 response.raise_for_status()
                 data = response.json()
                 logger.info(f"API response for {appeal_id}: {data}")
-                if data and isinstance(data, list) and len(data) > 0:
-                    return {"status": data[0].get("status", "unknown")}
+                # Flexible parsing based on docs’ POST response style
+                if isinstance(data, list) and len(data) > 0:
+                    # No explicit "status" in docs; guess it’s there or infer
+                    return {"status": data[0].get("status", "pending" if "amount_to_pay" in data[0] else "unknown")}
+                elif isinstance(data, dict):
+                    return {"status": data.get("status", "unknown")}
                 return None
             except requests.RequestException as e:
                 logger.error(f"Attempt {attempt + 1}/3 failed for {appeal_id}: {e}")
