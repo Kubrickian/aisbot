@@ -1,4 +1,5 @@
 import signal
+import asyncio  # Added this
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from .config import BOT_TOKEN
 from .utils import logger, load_groups, load_appeals_cache
@@ -12,11 +13,13 @@ def shutdown(signum, frame, application):
 def main():
     application = Application.builder().token(BOT_TOKEN).build()
 
+    # Load initial data
     application.bot_data["groups"] = load_groups()
     application.bot_data["appeals_cache"] = load_appeals_cache()
     logger.info(f"Loaded groups: {len(application.bot_data['groups']['merchant'])} merchants, {len(application.bot_data['groups']['trader'])} traders")
     logger.info(f"Loaded appeals cache: {len(application.bot_data['appeals_cache'])}")
 
+    # Register handlers
     application.add_handler(MessageHandler(filters.ALL, debug_update, block=False), group=-1)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("register_merchant", register_merchant))
@@ -26,8 +29,10 @@ def main():
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_handler(MessageHandler((filters.TEXT | filters.CAPTION) & ~filters.COMMAND, handle_message))
 
+    # Schedule reminder task
     application.job_queue.run_once(lambda ctx: asyncio.create_task(remind_traders(ctx)), 0)
 
+    # Handle shutdown
     signal.signal(signal.SIGINT, lambda s, f: shutdown(s, f, application))
     signal.signal(signal.SIGTERM, lambda s, f: shutdown(s, f, application))
 
